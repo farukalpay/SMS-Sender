@@ -103,7 +103,6 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     iteration = 0
 
     if len(proxies) > 0:
-        print(proxies)
         proxies = shuffle_proxies(proxies)
         proxy_iterator = itertools.cycle(proxies)
 
