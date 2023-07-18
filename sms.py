@@ -91,7 +91,6 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                     ip, port = proxy_parts
                     proxy_url = f'http://{ip}:{port}'
                 proxies = {'http': proxy_url}
-                print(f"proxyas: {proxies}")
                 response = session.post(url, proxies=proxies, data=payload, timeout=50)
                 return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
             except Exception as e:
