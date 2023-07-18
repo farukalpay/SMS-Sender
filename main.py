@@ -79,17 +79,23 @@ def get_proxy_or_file():
         if choice == '1':
             return get_proxy_details()
         elif choice == '2':
-            return None, get_file_path(f"{Fore.MAGENTA}Enter the file path of the .txt file containing the proxy details: {Fore.RESET}")
+            file_path = get_file_path(f"{Fore.MAGENTA}Enter the file path of the .txt file containing the proxy details: {Fore.RESET}")
+            proxies = read_file(file_path)
+            return None, proxies
         else:
             print(f"{Fore.RED}Invalid choice. Please enter 1 or 2.{Fore.RESET}")
 
-def get_proxy_file_path():
+def get_proxy_details():
+    proxies = []
     while True:
-        file_path = input(f"{Fore.MAGENTA}Enter the file path of the .txt file containing the proxy details: {Fore.RESET}")
-        if file_path.endswith('.txt'):
-            return file_path
+        proxy = input(f"{Fore.MAGENTA}Enter proxy credentials (ip:port:user:pw) if no authentication (ip:port) or press Enter for a proxy list file path: {Fore.RESET}")
+        if not proxy:
+            return None, proxies
+        elif is_valid_proxy(proxy):
+            proxies.append(proxy)
+            return None, proxies
         else:
-            print(f"{Fore.RED}Invalid file format. Please enter a .txt file.{Fore.RESET}")
+            print(f"{Fore.RED}Invalid proxy credentials. Please try again or press Enter for a proxy list file path.{Fore.RESET}")
 
 def read_file(file_path):
     with open(file_path, 'r') as f:
@@ -111,23 +117,8 @@ def test_proxy(proxy, developer_mode=False):
         return response.status_code == 200
     except Exception as e:
         if developer_mode:
-            print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}") # DEVELOPER MODE ONCEDEN CALISMIYOR BUNA EL AT
+            print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}") 
         return False
-
-def get_proxy_details():
-    proxies = []
-    proxy_file_path = None
-    while True:
-        proxy = input(f"{Fore.MAGENTA}Enter proxy credentials (ip:port:user:pw) if no authentication (ip:port) or press Enter for a proxy list file path: {Fore.RESET}")
-        if not proxy:
-            proxy_file_path = get_file_path(f"{Fore.MAGENTA}Enter the path to your proxy list file: {Fore.RESET}")
-            break
-        if is_valid_proxy(proxy):
-            proxies.append(proxy)
-            break
-        else:
-            print(f"{Fore.RED}Invalid proxy credentials. Please try again or press Enter for a proxy list file path.{Fore.RESET}")
-    return proxy_file_path, proxies
 
 def test_proxies_and_show_results(proxies, developer_mode=False):
     successful_proxies = []
