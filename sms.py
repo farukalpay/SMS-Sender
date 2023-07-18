@@ -46,22 +46,32 @@ def get_next_proxy(proxy_iterator, proxies):
         proxy_iterator = itertools.cycle(shuffle_proxies(proxies))
         return next(proxy_iterator)
     
-def handle_response(response, success_msg, failure_msg, developer_mode=False):
+def handle_response(response, success_msg, failure_msg, proxy, developer_mode=False):
     if developer_mode:
         print(f"Response: {response.text}")
     if success_msg in response.text:
-        return True, 'successful'
+        if proxy != "null":
+            return True, True, 'successful'
+        else:
+            return True, 'successful'
     elif failure_msg in response.text:
-        return False, 'failure'
+        if proxy != "null":
+            return False, True, 'failure'
+        else:
+            return False, 'failure'
     else:
-        return False, 'unknown response'
+        if proxy != "null":
+            return False, False, 'unknown response'
+        else:
+            return False, 'unknown response'
+        
 
-def send_request(phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
+def send_request(session, phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
     values = {
-    'first_name': first_name,
-    'last_name': last_name,
-    'gmail': gmail,
-    'phone_number': phone_number
+        'first_name': first_name,
+        'last_name': last_name,
+        'gmail': gmail,
+        'phone_number': phone_number
     }
     try:
         url = config['url']
@@ -81,19 +91,20 @@ def send_request(phone_number, first_name, last_name, gmail, proxy, config, deve
                     ip, port = proxy_parts
                     proxy_url = f'http://{ip}:{port}'
                 proxies = {'http': proxy_url}
-                response = requests.post(url, proxies=proxies, data=payload, timeout=50)
-                return handle_response(response, config['success'], config['failure'], developer_mode)
+                print(f"proxyas: {proxies}")
+                response = session.post(url, proxies=proxies, data=payload, timeout=50)
+                return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
             except Exception as e:
                 if developer_mode:
                     print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}")
-                return False, 'exception'
+                return False, False, 'exception'
         else:
-            response = requests.post(url, data=payload, timeout=50)
-            return handle_response(response, config['success'], config['failure'], developer_mode)
+            response = session.post(url, data=payload, timeout=50)
+            return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
     except Exception as e:
         if developer_mode:
             print(f"Error: {str(e)}")
-        return False, 'exception'
+        return False, False, 'exception'
 
 def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     total_successful_requests = 0
@@ -105,37 +116,43 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     if len(proxies) > 0:
         proxies = shuffle_proxies(proxies)
         proxy_iterator = itertools.cycle(proxies)
+    
+    # Create session object
+    session = requests.Session()
 
     while True:
         iteration += 1
         for index, phone_number in enumerate(phone_numbers):
             first_name, last_name, gmail = random_turkish_name_surname_gmail()
             start_time = time.time()
-        
+
             for website, config in website_configs.items():
                 success = False
+                success_request = False
                 msg = ''
                 proxy_used = None
                 failure_count = 0  # Initialize failure count for each website
 
-                while not success and len(proxies) > 0 and failure_count < 5:
-                    proxy_used = next(proxy_iterator)
-                    success, msg = send_request(phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
+                while not success_request and len(proxies) > 0 and failure_count < 5:
+                    proxy_used = get_next_proxy(proxy_iterator, proxies)
+                    success, success_request, msg = send_request(session, phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
         
-                    if not success:
+                    if not success_request:
                         print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}")
+                        proxy_used = get_next_proxy(proxy_iterator, proxies)
                         failure_count += 1  # Increment failure count on failure
 
                 if failure_count >= 5:
                     print(f"{Fore.RED}5 times failed for {website}. Moving on to next website.{Fore.RESET}")
+                    break  # break from this inner loop and move to the next website
 
                 if len(proxies) <= 0:
-                    success, msg = send_request(phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                    success, msg = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
 
                 if success:
                     successful_requests[phone_number] += 1
                     total_successful_requests += 1
-                else:
+                elif not success:
                     failed_requests[phone_number] += 1
                     total_failed_requests += 1
 
