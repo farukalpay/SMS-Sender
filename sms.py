@@ -61,7 +61,7 @@ def handle_response(response, success_msg, failure_msg, proxy, developer_mode=Fa
             return False, 'failure'
     else:
         if proxy != "null":
-            return False, False, 'unknown response'
+            return False, True, 'unknown response'
         else:
             return False, 'unknown response'
         
@@ -75,6 +75,7 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
     }
     try:
         url = config['url']
+        method = config.get('method', 'POST')  # Default to 'POST' if not specified
         if 'payload_function' in config:
             payload_function = config['payload_function']
             payload = payload_function(first_name, last_name, gmail, phone_number)
@@ -91,14 +92,26 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                     ip, port = proxy_parts
                     proxy_url = f'http://{ip}:{port}'
                 proxies = {'http': proxy_url}
-                response = session.post(url, proxies=proxies, data=payload, timeout=50)
+                if method.upper() == 'POST':
+                    response = session.post(url, proxies=proxies, data=payload, timeout=50, verify=False)
+                elif method.upper() == 'GET':
+                    response = session.get(url, proxies=proxies, params=payload, timeout=50, verify=False)
                 return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
             except Exception as e:
                 if developer_mode:
                     print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}")
                 return False, False, 'exception'
         else:
-            response = session.post(url, data=payload, timeout=50)
+            if method.upper() == 'POST':
+                try:
+                    response = session.post(url, data=payload, timeout=50, verify=False)
+                except requests.exceptions.Timeout:
+                    return False, False, 'response timeout'
+            elif method.upper() == 'GET':
+                try:
+                    response = session.get(url, params=payload, timeout=50, verify=False)
+                except requests.exceptions.Timeout:
+                    return False, False, 'response timeout'
             return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
     except Exception as e:
         if developer_mode:
