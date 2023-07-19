@@ -66,6 +66,9 @@ def handle_response(response, success_msg, failure_msg, proxy, developer_mode=Fa
             return False, 'unknown response'
         
 
+import json
+import requests
+
 def send_request(session, phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
     values = {
         'first_name': first_name,
@@ -73,16 +76,29 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
         'gmail': gmail,
         'phone_number': phone_number
     }
+    
     try:
         url = config['url']
         if url.startswith('https://'):
             url = url.replace('https://', 'http://')
         method = config.get('method', 'POST')  # Default to 'POST' if not specified
+
         if 'payload_function' in config:
             payload_function = config['payload_function']
             payload = payload_function(first_name, last_name, gmail, phone_number)
         else:
             payload = {k: v.format(**values) for k, v in config['payload'].items() if any(val in v for val in values.keys())}
+
+        if config.get('send_as_json', False):
+            payload = json.dumps(payload)  # Convert the payload to a JSON string if send_as_json is True
+
+        headers = {}
+        if config.get('send_with_headers', False):
+            headers = config.get('headers', {})  # Get headers from config if send_with_headers is True
+            if config.get('send_as_json', False):
+                headers['Content-Type'] = 'application/json'  # Ensure the content type is set to JSON
+        else:
+            headers = None
 
         if proxy != "null":
             try:
@@ -95,23 +111,27 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                     proxy_url = f'http://{ip}:{port}'
                 proxies = {'http': proxy_url}
                 if method.upper() == 'POST':
-                    response = session.post(url, proxies=proxies, data=payload, timeout=50, verify=False)
+                    if headers:
+                        print(headers) 
+                    response = session.post(url, proxies=proxies, headers=headers if headers else None, data=payload, timeout=50, verify=False)
                 elif method.upper() == 'GET':
-                    response = session.get(url, proxies=proxies, params=payload, timeout=50, verify=False)
+                    response = session.get(url, proxies=proxies, headers=headers if headers else None, params=payload, timeout=50, verify=False)
                 return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
             except Exception as e:
                 if developer_mode:
-                    print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}")
+                    print(f"Error testing proxy '{proxy}': {str(e)}")
                 return False, False, 'exception'
         else:
             if method.upper() == 'POST':
                 try:
-                    response = session.post(url, data=payload, timeout=50, verify=False)
+                    if headers:
+                        print(headers)
+                    response = session.post(url, headers=headers if headers else None, data=payload, timeout=50, verify=False)
                 except requests.exceptions.Timeout:
                     return False, False, 'response timeout'
             elif method.upper() == 'GET':
                 try:
-                    response = session.get(url, params=payload, timeout=50, verify=False)
+                    response = session.get(url, headers=headers if headers else None, params=payload, timeout=50, verify=False)
                 except requests.exceptions.Timeout:
                     return False, False, 'response timeout'
             return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
