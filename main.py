@@ -48,10 +48,10 @@ def get_phone_number():
 def get_file_path(prompt=f"{Fore.MAGENTA}Enter the file path of the .txt file: {Fore.RESET}"):
     while True:
         file_path = input(prompt)
-        if file_path.endswith('.txt'):
+        if os.path.isfile(file_path) and file_path.endswith('.txt'):
             return file_path
         else:
-            print(f"{Fore.RED}Invalid file format. Please enter a .txt file.{Fore.RESET}")
+            print(f"{Fore.RED}Invalid file path or format. Please enter a valid .txt file.{Fore.RESET}")
 
 def get_proxy_choice():
     choice = input(f"{Fore.MAGENTA}Would you like to use a proxy? (y/n): {Fore.RESET}").lower()
@@ -101,6 +101,9 @@ def get_proxy_details():
             print(f"{Fore.RED}Invalid proxy credentials. Please try again or type 'exit' to finish.{Fore.RESET}")
 
 def read_file(file_path):
+    if not file_path or not os.path.isfile(file_path):
+        print(f"{Fore.RED}Invalid file path. Please try again.{Fore.RESET}")
+        return []
     with open(file_path, 'r') as f:
         items = [line.strip() for line in f.readlines()]
     return items
@@ -160,19 +163,26 @@ def main():
     phone_number, file_path = get_phone_number_or_file()
     if file_path:
         phone_numbers = read_file(file_path)
+        if phone_numbers is None:
+            return
         valid_phone_numbers, invalid_phone_numbers = validate_phone_numbers(phone_numbers)
         if len(valid_phone_numbers) == 0:
-            print(f"{Fore.RED}No valid phone numbers found. Quitting.{Fore.RESET}")
+            print(f"{Fore.RED}No valid phone numbers found in the provided file. Quitting.{Fore.RESET}")
             return
         phone_numbers = valid_phone_numbers
-    else:
+    elif phone_number:
         phone_numbers = [phone_number]
+    else:
+        print(f"{Fore.RED}No valid input provided. Quitting.{Fore.RESET}")
+        return
 
     use_proxy = get_proxy_choice()
     if use_proxy:
         proxy_file_path, proxy_details = get_proxy_or_file()
         if proxy_file_path:
             proxies = read_file(proxy_file_path)
+            if proxies is None:
+                return
             valid_proxies, invalid_proxies = validate_proxies(proxies)
             if len(valid_proxies) == 0:
                 print(f"{Fore.RED}No valid proxies found. Quitting.{Fore.RESET}")
@@ -180,7 +190,7 @@ def main():
             proxies = valid_proxies
         else:
             proxies = proxy_details  # Use the entered proxy details directly
-        
+
         test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
         if test_proxies == 'y':
             successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
