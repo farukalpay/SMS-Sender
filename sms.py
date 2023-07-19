@@ -75,6 +75,8 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
     }
     try:
         url = config['url']
+        if url.startswith('https://'):
+            url = url.replace('https://', 'http://')
         method = config.get('method', 'POST')  # Default to 'POST' if not specified
         if 'payload_function' in config:
             payload_function = config['payload_function']
@@ -170,7 +172,7 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
 
                 if developer_mode:
                     print(f"Response: {msg}")
-                print(f"{Fore.GREEN}[{website}] | Proxy: {proxy_used} | Number: {index + 1}/{len(phone_numbers)} ({phone_number}) | Success: {successful_requests[phone_number]} | {Fore.RED}Failed: {failed_requests[phone_number]}{Fore.RESET}")
+                print(f"{Fore.CYAN}[{website}]{Fore.GREEN} | Proxy: {proxy_used} | Number: {index + 1}/{len(phone_numbers)} ({phone_number}) | Success: {successful_requests[phone_number]} | {Fore.RED}Failed: {failed_requests[phone_number]}{Fore.RESET}")
 
             elapsed_time = time.time() - start_time
             estimated_remaining_time = (elapsed_time / (index + 1)) * (len(phone_numbers) - (index + 1))

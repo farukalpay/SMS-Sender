@@ -88,14 +88,17 @@ def get_proxy_or_file():
 def get_proxy_details():
     proxies = []
     while True:
-        proxy = input(f"{Fore.MAGENTA}Enter proxy credentials (ip:port:user:pw) if no authentication (ip:port) or press Enter for a proxy list file path: {Fore.RESET}")
-        if not proxy:
-            return None, proxies
+        proxy = input(f"{Fore.MAGENTA}Enter your proxy credentials in the following format - (ip:port or ip:port:user:password), or type 'exit' to finish: {Fore.RESET}")
+        if proxy.lower() == 'exit':
+            if proxies:  # If there are valid proxies added, return them
+                return None, proxies
+            else:  # If no valid proxies were added, return an error
+                print(f"{Fore.RED}No valid proxy details provided. Please try again.{Fore.RESET}")
         elif is_valid_proxy(proxy):
             proxies.append(proxy)
             return None, proxies
         else:
-            print(f"{Fore.RED}Invalid proxy credentials. Please try again or press Enter for a proxy list file path.{Fore.RESET}")
+            print(f"{Fore.RED}Invalid proxy credentials. Please try again or type 'exit' to finish.{Fore.RESET}")
 
 def read_file(file_path):
     with open(file_path, 'r') as f:
