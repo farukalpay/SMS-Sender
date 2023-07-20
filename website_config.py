@@ -1,5 +1,5 @@
 website_configs = {
-    'kigili': {
+    'website1': {
         'url': 'https://www.x.com/api',
         'method': 'POST',
         'send_as_json': False,
@@ -13,7 +13,7 @@ website_configs = {
         'success': 'registered',
         'failure': 'Failed to send'
     },
-    'fizy': {
+    'website2': {
         'url': 'https://www.x.com/api',
         'method': 'POST',
         'send_as_json': False,
@@ -24,7 +24,7 @@ website_configs = {
         'success': '0',
         'failure': 'false'
     },
-    'boyner': {
+    'website3': {
         'url': 'https://www.x.com/api',
         'method': 'POST',
         'send_as_json': True,
@@ -48,7 +48,7 @@ website_configs = {
         'success': 'origin',
         'failure': 'Method Not Allowed'
     },
-    'website2': {
+    'website4': {
         'url': 'http://httpbin.org/ip',
         'method': 'POST',
         'send_as_json': False,
