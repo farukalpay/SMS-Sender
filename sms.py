@@ -3,8 +3,12 @@ import random
 import string
 import time
 import itertools
+import json
+import urllib3
 from website_config import website_configs
 from colorama import Fore, init
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 init(autoreset=True)
 
@@ -49,7 +53,11 @@ def get_next_proxy(proxy_iterator, proxies):
 def handle_response(response, success_msg, failure_msg, proxy, developer_mode=False):
     if developer_mode:
         print(f"Response: {response.text}")
-    if success_msg in response.text:
+        
+    # success_msg could be a list or a string, ensure it is always a list for consistency
+    success_msg = success_msg if isinstance(success_msg, list) else [success_msg]
+    
+    if any(msg in response.text for msg in success_msg):
         if proxy != "null":
             return True, True, 'successful'
         else:
@@ -64,10 +72,6 @@ def handle_response(response, success_msg, failure_msg, proxy, developer_mode=Fa
             return False, True, 'unknown response'
         else:
             return False, 'unknown response'
-        
-
-import json
-import requests
 
 def send_request(session, phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
     values = {
@@ -143,8 +147,10 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
 def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     total_successful_requests = 0
     total_failed_requests = 0
+    total_unknown_requests = 0
     successful_requests = {phone_number: 0 for phone_number in phone_numbers}
     failed_requests = {phone_number: 0 for phone_number in phone_numbers}
+    unknown_requests = {phone_number: 0 for phone_number in phone_numbers}
     iteration = 0
 
     if len(proxies) > 0:
@@ -186,16 +192,22 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                 if success:
                     successful_requests[phone_number] += 1
                     total_successful_requests += 1
+                    print(f"{Fore.CYAN}[{website}]{Fore.GREEN} Request is successfull for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
                 elif not success:
-                    failed_requests[phone_number] += 1
-                    total_failed_requests += 1
+                    if msg == 'unknown response':
+                        unknown_requests[phone_number] += 1
+                        total_unknown_requests += 1
+                        print(f"{Fore.CYAN}[{website}]{Fore.YELLOW} Request is unknown for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
+                    else:
+                        failed_requests[phone_number] += 1
+                        total_failed_requests += 1
+                        print(f"{Fore.CYAN}[{website}]{Fore.RED} Request is unsuccessfull for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
 
                 if developer_mode:
                     print(f"Response: {msg}")
-                print(f"{Fore.CYAN}[{website}]{Fore.GREEN} | Proxy: {proxy_used} | Number: {index + 1}/{len(phone_numbers)} ({phone_number}) | Success: {successful_requests[phone_number]} | {Fore.RED}Failed: {failed_requests[phone_number]}{Fore.RESET}")
 
             elapsed_time = time.time() - start_time
             estimated_remaining_time = (elapsed_time / (index + 1)) * (len(phone_numbers) - (index + 1))
-            print(f"{Fore.YELLOW}Loop: {iteration} | Number {index + 1}/{len(phone_numbers)} completed. Estimated time remaining until end of loop: {estimated_remaining_time:.2f} seconds")
+            print(f"{Fore.BLUE}Loop: {iteration} | Number {index + 1}/{len(phone_numbers)} completed. Estimated time remaining until end of loop: {estimated_remaining_time:.2f} seconds")
 
-            print(f"{Fore.CYAN}Total successful requests across all numbers: {total_successful_requests} | Total failed requests: {total_failed_requests}")
+            print(f"{Fore.BLUE}Total successful requests: {total_successful_requests} | Total failed requests: {total_failed_requests} | Total unknown requests: {total_unknown_requests}")

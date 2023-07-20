@@ -1,9 +1,12 @@
 import re
 import requests
 import os
+import urllib3
 from colorama import Fore, init
 from sms import send_sms_requests
 from titlescreen import print_title_screen
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
@@ -88,17 +91,12 @@ def get_proxy_or_file():
 def get_proxy_details():
     proxies = []
     while True:
-        proxy = input(f"{Fore.MAGENTA}Enter your proxy credentials in the following format - (ip:port or ip:port:user:password), or type 'exit' to finish: {Fore.RESET}")
-        if proxy.lower() == 'exit':
-            if proxies:  # If there are valid proxies added, return them
-                return None, proxies
-            else:  # If no valid proxies were added, return an error
-                print(f"{Fore.RED}No valid proxy details provided. Please try again.{Fore.RESET}")
-        elif is_valid_proxy(proxy):
+        proxy = input(f"{Fore.MAGENTA}Enter your proxy credentials in the following format - (ip:port or ip:port:user:password):{Fore.RESET}")
+        if is_valid_proxy(proxy):
             proxies.append(proxy)
             return None, proxies
         else:
-            print(f"{Fore.RED}Invalid proxy credentials. Please try again or type 'exit' to finish.{Fore.RESET}")
+            print(f"{Fore.RED}Invalid proxy credentials. Please try again.{Fore.RESET}")
 
 def read_file(file_path):
     if not file_path or not os.path.isfile(file_path):
@@ -148,8 +146,8 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
             print(f"{Fore.RED}{proxy} - FAILED{Fore.RESET}")
 
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
-    print(f"Successful proxies: {successful_proxies_count}")
-    print(f"Unsuccessful proxies: {unsuccessful_proxies_count}{Fore.RESET}")
+    print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
+    print(f"{Fore.RED}Unsuccessful proxies: {unsuccessful_proxies_count}{Fore.RESET}")
 
     return successful_proxies, unsuccessful_proxies
 
