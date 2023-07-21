@@ -49,29 +49,62 @@ def get_next_proxy(proxy_iterator, proxies):
     except StopIteration:
         proxy_iterator = itertools.cycle(shuffle_proxies(proxies))
         return next(proxy_iterator)
-    
-def handle_response(response, success_msg, failure_msg, proxy, developer_mode=False):
+
+def handle_response(response, success_criteria, failure_msg, response_base, proxy, developer_mode=False):
     if developer_mode:
         print(f"Response: {response.text}")
+        print(f"Response status code: {response.status_code}")
         
-    # success_msg could be a list or a string, ensure it is always a list for consistency
-    success_msg = success_msg if isinstance(success_msg, list) else [success_msg]
+    # success_criteria and failure_msg could be a list or a string, ensure they are always lists of strings for consistency
+    success_criteria = [str(criteria) for criteria in (success_criteria if isinstance(success_criteria, list) else [success_criteria])]
+    if failure_msg != "null":
+        failure_msg = [str(msg) for msg in (failure_msg if isinstance(failure_msg, list) else [failure_msg])]
     
-    if any(msg in response.text for msg in success_msg):
-        if proxy != "null":
-            return True, True, 'successful'
+    if response_base == "text":
+        check_attribute = response.text
+        if any(criteria in check_attribute for criteria in success_criteria):
+            if proxy != "null":
+                return True, True, 'successful'
+            else:
+                return True, 'successful'
+        elif any(msg in check_attribute for msg in failure_msg):
+            if proxy != "null":
+                return False, True, 'failure'
+            else:
+                return False, 'failure'
+    elif response_base == "status":
+        status_code = str(response.status_code)
+        if developer_mode:
+            print(f"Status Code: {status_code} Success Criteria: {success_criteria}")
+        if status_code in success_criteria:
+            if proxy != "null":
+                return True, True, 'successful'
+            else:
+                return True, 'successful'
         else:
-            return True, 'successful'
-    elif any(msg in response.text for msg in failure_msg):
-        if proxy != "null":
-            return False, True, 'failure'
-        else:
-            return False, 'failure'
+            if proxy != "null":
+                return False, True, 'failure'
+            else:
+                return False, 'failure'
+
+    # If no success or failure conditions matched, return 'unknown response'
+    if proxy != "null":
+        return False, True, 'unknown response'
     else:
-        if proxy != "null":
-            return False, True, 'unknown response'
+        return False, 'unknown response'
+        
+def handle_errors(developer_mode, e=None, proxy=None):
+    if isinstance(e, requests.exceptions.Timeout):
+        return False, 'response timeout'
+    else:
+        if developer_mode and e:
+            print(f"Error: {str(e)}")
+        if proxy:
+            if developer_mode:
+                print(f"Error testing proxy '{proxy}': {str(e)}")
+            return False, False, 'exception'
         else:
-            return False, 'unknown response'
+            return False, 'exception'
 
 def send_request(session, phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
     values = {
@@ -84,7 +117,7 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
     try:
         url = config['url']
         if url.startswith('https://'):
-            url = url.replace('https://', 'http://')
+            url = url.replace('https://', 'https://')
         method = config.get('method', 'POST')  # Default to 'POST' if not specified
 
         if 'payload_function' in config:
@@ -103,7 +136,15 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                 headers['Content-Type'] = 'application/json'  # Ensure the content type is set to JSON
         else:
             headers = None
-
+        if config.get('send_with_cookies', False):
+            cookies = config.get('cookies', {})
+        else:
+            cookies = None
+        if config.get('response_base') in ["text", "status"]:
+            response_base = config.get('response_base', {})
+        else:
+            print(f"{Fore.RED}response_base is not valid. Quiting..")
+            return
         if proxy != "null":
             try:
                 proxy_parts = proxy.split(':')
@@ -116,37 +157,42 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                 proxies = {'http': proxy_url}
                 if method.upper() == 'POST':
                     if headers:
-                        print(headers) 
-                    response = session.post(url, proxies=proxies, headers=headers if headers else None, data=payload, timeout=50, verify=False)
+                        if developer_mode:
+                            print(headers) 
+                    response = session.post(url, proxies=proxies, headers=headers if headers else None, cookies=cookies if cookies else None, data=payload, timeout=50, verify=False)
                 elif method.upper() == 'GET':
-                    response = session.get(url, proxies=proxies, headers=headers if headers else None, params=payload, timeout=50, verify=False)
-                return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
+                    response = session.get(url, proxies=proxies, headers=headers if headers else None, cookies=cookies if cookies else None, params=payload, timeout=50, verify=False)
+                return handle_response(
+                    response,
+                    config['success'] if response_base == "text" else config['status_code'],
+                    config['failure'] if response_base == "text" else "null",
+                    response_base,
+                    proxy,
+                    developer_mode
+                )
             except Exception as e:
-                if developer_mode:
-                    print(f"Error testing proxy '{proxy}': {str(e)}")
-                return False, False, 'exception'
+                return handle_errors(developer_mode, e, proxy)
         else:
             if method.upper() == 'POST':
                 try:
                     if headers:
                         print(headers)
-                    response = session.post(url, headers=headers if headers else None, data=payload, timeout=50, verify=False)
-                except requests.exceptions.Timeout:
-                    return False, 'response timeout'
+                    response = session.post(url, headers=headers if headers else None, cookies=cookies if cookies else None, data=payload, timeout=50, verify=False)
                 except Exception as e:
-                    if developer_mode:
-                        print(f"Error: {str(e)}")
-                    return False, 'exception'
+                    return handle_errors(developer_mode, e)
             elif method.upper() == 'GET':
                 try:
-                    response = session.get(url, headers=headers if headers else None, params=payload, timeout=50, verify=False)
-                except requests.exceptions.Timeout:
-                    return False, 'response timeout'
+                    response = session.get(url, headers=headers if headers else None, cookies=cookies if cookies else None, params=payload, timeout=50, verify=False)
                 except Exception as e:
-                    if developer_mode:
-                        print(f"Error: {str(e)}")
-                    return False, 'exception'
-            return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
+                    return handle_errors(developer_mode, e)
+            return handle_response(
+                response,
+                config['success'] if response_base == "text" else config['status_code'],
+                config['failure'] if response_base == "text" else "null",
+                response_base,
+                "null",
+                developer_mode
+            )
     except Exception as e:
         if developer_mode:
             print(f"Error: {str(e)}")
@@ -184,7 +230,9 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                 while not success_request and len(proxies) > 0 and failure_count < 5:
                     proxy_used = get_next_proxy(proxy_iterator, proxies)
                     success, success_request, msg = send_request(session, phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
-        
+                    if developer_mode:
+                        print(result)
+                    success, success_request, msg = result
                     if not success_request:
                         print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}")
                         proxy_used = get_next_proxy(proxy_iterator, proxies)
@@ -195,7 +243,10 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                     break  # break from this inner loop and move to the next website
 
                 if len(proxies) <= 0:
-                    success, msg = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                    result = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                    if developer_mode:
+                        print(result)
+                    success, msg = result
 
                 if success:
                     successful_requests[phone_number] += 1
@@ -212,7 +263,7 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                         print(f"{Fore.CYAN}[{website}]{Fore.RED} Request is unsuccessfull for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
 
                 if developer_mode:
-                    print(f"Response: {msg}")
+                    print(f"msg: {msg}")
 
             elapsed_time = time.time() - start_time
             estimated_remaining_time = (elapsed_time / (index + 1)) * (len(phone_numbers) - (index + 1))
