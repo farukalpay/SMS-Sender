@@ -128,8 +128,8 @@ def read_file(file_path):
         return []
     encoding = get_encoding(file_path)
     with open(file_path, 'r', encoding=encoding) as f:
-        items = [line.strip().split()[0] for line in f.readlines()]
-    items = list(set(items))
+        items = [line.strip().split()[0] for line in f.readlines() if line.strip()]
+    items = list(set(items))  # Remove duplicates
     return items
 
 def test_proxy(proxy, developer_mode=False):
