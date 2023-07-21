@@ -132,12 +132,20 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                         print(headers)
                     response = session.post(url, headers=headers if headers else None, data=payload, timeout=50, verify=False)
                 except requests.exceptions.Timeout:
-                    return False, False, 'response timeout'
+                    return False, 'response timeout'
+                except Exception as e:
+                    if developer_mode:
+                        print(f"Error: {str(e)}")
+                    return False, 'exception'
             elif method.upper() == 'GET':
                 try:
                     response = session.get(url, headers=headers if headers else None, params=payload, timeout=50, verify=False)
                 except requests.exceptions.Timeout:
-                    return False, False, 'response timeout'
+                    return False, 'response timeout'
+                except Exception as e:
+                    if developer_mode:
+                        print(f"Error: {str(e)}")
+                    return False, 'exception'
             return handle_response(response, config['success'], config['failure'], proxy, developer_mode)
     except Exception as e:
         if developer_mode:
@@ -187,7 +195,9 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                     break  # break from this inner loop and move to the next website
 
                 if len(proxies) <= 0:
-                    success, msg = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                    result = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                    print(result)
+                    success, msg = result
 
                 if success:
                     successful_requests[phone_number] += 1
