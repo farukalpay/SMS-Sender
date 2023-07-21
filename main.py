@@ -7,6 +7,7 @@ from colorama import Fore, init
 from sms import send_sms_requests
 from titlescreen import print_title_screen
 
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
