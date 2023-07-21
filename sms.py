@@ -195,9 +195,7 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                     break  # break from this inner loop and move to the next website
 
                 if len(proxies) <= 0:
-                    result = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
-                    print(result)
-                    success, msg = result
+                    success, msg = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
 
                 if success:
                     successful_requests[phone_number] += 1
