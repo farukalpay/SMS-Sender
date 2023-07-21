@@ -156,9 +156,8 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                     proxy_url = f'http://{ip}:{port}'
                 proxies = {'http': proxy_url}
                 if method.upper() == 'POST':
-                    if headers:
-                        if developer_mode:
-                            print(headers) 
+                    if headers and developer_mode:
+                        print(headers) 
                     response = session.post(url, proxies=proxies, headers=headers if headers else None, cookies=cookies if cookies else None, data=payload, timeout=50, verify=False)
                 elif method.upper() == 'GET':
                     response = session.get(url, proxies=proxies, headers=headers if headers else None, cookies=cookies if cookies else None, params=payload, timeout=50, verify=False)
@@ -175,7 +174,7 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
         else:
             if method.upper() == 'POST':
                 try:
-                    if headers:
+                    if headers and developer_mode:
                         print(headers)
                     response = session.post(url, headers=headers if headers else None, cookies=cookies if cookies else None, data=payload, timeout=50, verify=False)
                 except Exception as e:

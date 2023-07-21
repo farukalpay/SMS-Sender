@@ -7,7 +7,6 @@ from colorama import Fore, init
 from sms import send_sms_requests
 from titlescreen import print_title_screen
 
-
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -180,7 +179,7 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
 
 def main():
     print_title_screen()
-    
+
     print (r"""[ ! ] For authorized testing only. Use responsibly with explicit permission. Developer not responsible for illegal use.
            """)
 
@@ -210,16 +209,16 @@ def main():
             print(f"{Fore.RED}No valid proxies found. Quitting.{Fore.RESET}")
             return
         proxies = valid_proxies
+
+        test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
+        if test_proxies == 'y':
+            successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
+            if len(successful_proxies) == 0:
+                print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
+                return
+            proxies = successful_proxies
     else:
         proxies = []
-
-    test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
-    if test_proxies == 'y':
-        successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
-        if len(successful_proxies) == 0:
-            print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
-            return
-        proxies = successful_proxies
 
     send_sms_choice = input(f"{Fore.MAGENTA}Do you want to start sending SMS? (y/n): {Fore.RESET}").lower()
 
