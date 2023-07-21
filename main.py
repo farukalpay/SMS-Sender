@@ -2,6 +2,7 @@ import re
 import requests
 import os
 import urllib3
+import chardet
 from colorama import Fore, init
 from sms import send_sms_requests
 from titlescreen import print_title_screen
@@ -61,8 +62,10 @@ def get_proxy_choice():
     return choice == 'y'
 
 def is_valid_proxy(proxy):
-    pattern = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{1,5}(:\w*)?(:\w*)?$'
-    return re.match(pattern, proxy)
+    pattern = re.compile(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5})(:(\w+):(\w+))?$")
+    if re.match(pattern, proxy):
+        return True
+    return False
 
 def validate_proxies(proxies):
     valid_proxies = []
@@ -79,12 +82,26 @@ def validate_proxies(proxies):
 def get_proxy_or_file():
     while True:
         choice = input(f"{Fore.MAGENTA}Enter (1) to input proxy details or (2) to provide a file path: {Fore.RESET}").lower()
+
         if choice == '1':
-            return get_proxy_details()
+            proxies = get_proxy_details()
+            if proxies:  # Check if list is not empty
+                return proxies
+            print(f"{Fore.RED}Invalid proxy details. Please try again.{Fore.RESET}")
+
         elif choice == '2':
             file_path = get_file_path(f"{Fore.MAGENTA}Enter the file path of the .txt file containing the proxy details: {Fore.RESET}")
-            proxies = read_file(file_path)
-            return None, proxies
+            if file_path is not None:
+                try:
+                    proxies = read_file(file_path)
+                except Exception as e:
+                  print(f"{Fore.RED}Unable to read proxy file path. Please make sure file only includes proxies. Quiting.")
+                  print(f"Exception: {e}")
+                  return  
+                if proxies is not None and len(proxies) > 0:
+                    return proxies
+                print(f"{Fore.RED}No valid proxies found in the provided file. Please try again.{Fore.RESET}")
+
         else:
             print(f"{Fore.RED}Invalid choice. Please enter 1 or 2.{Fore.RESET}")
 
@@ -93,17 +110,26 @@ def get_proxy_details():
     while True:
         proxy = input(f"{Fore.MAGENTA}Enter your proxy credentials in the following format - (ip:port or ip:port:user:password):{Fore.RESET}")
         if is_valid_proxy(proxy):
+            # Only use the ip:port or ip:port:user:password part for the actual proxy
+            proxy = proxy.split()[0]
             proxies.append(proxy)
-            return None, proxies
+            return proxies  # Return just the list of proxies
         else:
             print(f"{Fore.RED}Invalid proxy credentials. Please try again.{Fore.RESET}")
+
+def get_encoding(file_path):
+    with open(file_path, 'rb') as f:
+        result = chardet.detect(f.read())
+    return result['encoding']
 
 def read_file(file_path):
     if not file_path or not os.path.isfile(file_path):
         print(f"{Fore.RED}Invalid file path. Please try again.{Fore.RESET}")
         return []
-    with open(file_path, 'r') as f:
-        items = [line.strip() for line in f.readlines()]
+    encoding = get_encoding(file_path)
+    with open(file_path, 'r', encoding=encoding) as f:
+        items = [line.strip().split()[0] for line in f.readlines()]
+    items = list(set(items))
     return items
 
 def test_proxy(proxy, developer_mode=False):
@@ -139,11 +165,11 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
         if is_successful:
             successful_proxies.append(proxy)
             successful_proxies_count += 1
-            print(f"{Fore.GREEN}{proxy} - SUCCESS{Fore.RESET}")
+            print(f'{Fore.GREEN}{proxy.split(":")[0]} - SUCCESS{Fore.RESET}')
         else:
             unsuccessful_proxies.append(proxy)
             unsuccessful_proxies_count += 1
-            print(f"{Fore.RED}{proxy} - FAILED{Fore.RESET}")
+            print(f'{Fore.RED}{proxy.split(":")[0]} - FAILED{Fore.RESET}')
 
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
     print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
@@ -153,10 +179,9 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
 
 def main():
     print_title_screen()
+    
     print (r"""[ ! ] For authorized testing only. Use responsibly with explicit permission. Developer not responsible for illegal use.
-           
            """)
-    developer_mode = False
 
     phone_number, file_path = get_phone_number_or_file()
     if file_path:
@@ -176,28 +201,24 @@ def main():
 
     use_proxy = get_proxy_choice()
     if use_proxy:
-        proxy_file_path, proxy_details = get_proxy_or_file()
-        if proxy_file_path:
-            proxies = read_file(proxy_file_path)
-            if proxies is None:
-                return
-            valid_proxies, invalid_proxies = validate_proxies(proxies)
-            if len(valid_proxies) == 0:
-                print(f"{Fore.RED}No valid proxies found. Quitting.{Fore.RESET}")
-                return
-            proxies = valid_proxies
-        else:
-            proxies = proxy_details  # Use the entered proxy details directly
-
-        test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
-        if test_proxies == 'y':
-            successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
-            if len(successful_proxies) == 0:
-                print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
-                return
-            proxies = successful_proxies
+        proxy = get_proxy_or_file()
+        if proxy is None:
+            return
+        valid_proxies, invalid_proxies = validate_proxies(proxy)
+        if len(valid_proxies) == 0:
+            print(f"{Fore.RED}No valid proxies found. Quitting.{Fore.RESET}")
+            return
+        proxies = valid_proxies
     else:
         proxies = []
+
+    test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
+    if test_proxies == 'y':
+        successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
+        if len(successful_proxies) == 0:
+            print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
+            return
+        proxies = successful_proxies
 
     send_sms_choice = input(f"{Fore.MAGENTA}Do you want to start sending SMS? (y/n): {Fore.RESET}").lower()
 
@@ -208,7 +229,7 @@ def main():
     else:
         print(f"{Fore.YELLOW}SMS sending process terminated.{Fore.RESET}")
         return
-    os.system('cls')
+
     print_title_screen()
     send_sms_requests(phone_numbers, proxies, developer_mode)
 
