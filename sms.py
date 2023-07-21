@@ -62,7 +62,7 @@ def handle_response(response, success_msg, failure_msg, proxy, developer_mode=Fa
             return True, True, 'successful'
         else:
             return True, 'successful'
-    elif failure_msg in response.text:
+    elif any(msg in response.text for msg in failure_msg):
         if proxy != "null":
             return False, True, 'failure'
         else:
