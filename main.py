@@ -3,6 +3,7 @@ import requests
 import os
 import urllib3
 import chardet
+import concurrent.futures
 from colorama import Fore, init
 from sms import send_sms_requests
 from titlescreen import print_title_screen
@@ -134,7 +135,7 @@ def read_file(file_path):
 
 def test_proxy(proxy, developer_mode=False):
     test_http_url = 'http://httpbin.org/ip'
-    test_https_url = 'https://www.google.com'
+    test_https_url = 'https://api.myip.com/'
     proxy_results = {'http': False, 'https': False}
 
     try:
@@ -148,11 +149,11 @@ def test_proxy(proxy, developer_mode=False):
         proxies = {'http': proxy_url, 'https': proxy_url}
 
         # Test HTTP
-        response_http = requests.get(test_http_url, proxies=proxies, timeout=100)
+        response_http = requests.get(test_http_url, proxies=proxies, timeout=50)
         proxy_results['http'] = response_http.status_code == 200
 
         # Test HTTPS
-        response_https = requests.get(test_https_url, proxies=proxies, timeout=100)
+        response_https = requests.get(test_https_url, proxies=proxies, timeout=50)
         proxy_results['https'] = response_https.status_code == 200
 
     except Exception as e:
@@ -160,6 +161,9 @@ def test_proxy(proxy, developer_mode=False):
             print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}") 
 
     return proxy_results
+
+def get_max_workers(proxies):
+    return min(len(proxies), 5000)
 
 def test_proxies_and_show_results(proxies, developer_mode=False):
     successful_proxies = []
@@ -170,22 +174,44 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
 
     print(f"{Fore.CYAN}Testing proxies...{Fore.RESET}")
 
-    for proxy in proxies:
-        proxy_results = test_proxy(proxy, developer_mode)
-        tested_proxies_count += 1
-        if proxy_results['http'] or proxy_results['https']:
-            successful_proxies.append(proxy)
-            successful_proxies_count += 1
-            if proxy_results['http'] and proxy_results['https']:
-                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP/HTTPS{Fore.RESET}')
-            elif proxy_results['http']:
-                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP{Fore.RESET}')
-            else: 
-                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTPS{Fore.RESET}')
-        else:
-            print(f'{Fore.RED}{proxy.split(":")[0]}{Fore.RESET}')
-            unsuccessful_proxies.append(proxy)
-            unsuccessful_proxies_count += 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=get_max_workers(proxies)) as executor:
+        future_to_proxy = {executor.submit(test_proxy, proxy, developer_mode): proxy for proxy in proxies}
+        for future in concurrent.futures.as_completed(future_to_proxy):
+            proxy = future_to_proxy[future]
+            try:
+                proxy_results = future.result()
+            except Exception as exc:
+                print(f"{Fore.RED}Error testing proxy '{proxy}': {exc}{Fore.RESET}")
+                continue
+
+            tested_proxies_count += 1
+            if proxy_results['http'] or proxy_results['https']:
+                proxy_parts = proxy.split(':')
+                if len(proxy_parts) == 4:
+                    ip, port, username, password = proxy_parts
+                else:
+                    ip, port = proxy_parts
+
+                if proxy_results['http']:
+                    protocol = 'http'
+                    proxy_url = f'{protocol}://{username}:{password}@{ip}:{port}' if len(proxy_parts) == 4 else f'{protocol}://{ip}:{port}'
+                    successful_proxies.append(proxy_url)
+                if proxy_results['https']:
+                    protocol = 'https'
+                    proxy_url = f'{protocol}://{username}:{password}@{ip}:{port}' if len(proxy_parts) == 4 else f'{protocol}://{ip}:{port}'
+                    successful_proxies.append(proxy_url)
+
+                successful_proxies_count += 1
+                if proxy_results['http'] and proxy_results['https']:
+                    print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP/HTTPS{Fore.RESET}')
+                elif proxy_results['http']:
+                    print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP{Fore.RESET}')
+                else: 
+                    print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTPS{Fore.RESET}')
+            else:
+                print(f'{Fore.RED}{proxy.split(":")[0]}{Fore.RESET}')
+                unsuccessful_proxies.append(proxy)
+                unsuccessful_proxies_count += 1
 
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
     print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
@@ -226,13 +252,11 @@ def main():
             return
         proxies = valid_proxies
 
-        test_proxies = input(f"{Fore.MAGENTA}Would you like to test proxies? (y/n): {Fore.RESET}").lower()
-        if test_proxies == 'y':
-            successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
-            if len(successful_proxies) == 0:
-                print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
-                return
-            proxies = successful_proxies
+        successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
+        if len(successful_proxies) == 0:
+            print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
+            return
+        proxies = successful_proxies
     else:
         proxies = []
 
