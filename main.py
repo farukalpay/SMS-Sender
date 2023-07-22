@@ -133,7 +133,10 @@ def read_file(file_path):
     return items
 
 def test_proxy(proxy, developer_mode=False):
-    test_url = 'http://httpbin.org/ip'
+    test_http_url = 'http://httpbin.org/ip'
+    test_https_url = 'https://www.google.com'
+    proxy_results = {'http': False, 'https': False}
+
     try:
         proxy_parts = proxy.split(':')
         if len(proxy_parts) == 4:
@@ -142,13 +145,21 @@ def test_proxy(proxy, developer_mode=False):
         else:
             ip, port = proxy_parts
             proxy_url = f'http://{ip}:{port}'
-        proxies = {'http': proxy_url}
-        response = requests.get(test_url, proxies=proxies, timeout=50)
-        return response.status_code == 200
+        proxies = {'http': proxy_url, 'https': proxy_url}
+
+        # Test HTTP
+        response_http = requests.get(test_http_url, proxies=proxies, timeout=100)
+        proxy_results['http'] = response_http.status_code == 200
+
+        # Test HTTPS
+        response_https = requests.get(test_https_url, proxies=proxies, timeout=100)
+        proxy_results['https'] = response_https.status_code == 200
+
     except Exception as e:
         if developer_mode:
             print(f"{Fore.RED}Error testing proxy '{proxy}': {e}{Fore.RESET}") 
-        return False
+
+    return proxy_results
 
 def test_proxies_and_show_results(proxies, developer_mode=False):
     successful_proxies = []
@@ -160,16 +171,21 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
     print(f"{Fore.CYAN}Testing proxies...{Fore.RESET}")
 
     for proxy in proxies:
-        is_successful = test_proxy(proxy, developer_mode)
+        proxy_results = test_proxy(proxy, developer_mode)
         tested_proxies_count += 1
-        if is_successful:
+        if proxy_results['http'] or proxy_results['https']:
             successful_proxies.append(proxy)
             successful_proxies_count += 1
-            print(f'{Fore.GREEN}{proxy.split(":")[0]} - SUCCESS{Fore.RESET}')
+            if proxy_results['http'] and proxy_results['https']:
+                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP/HTTPS{Fore.RESET}')
+            elif proxy_results['http']:
+                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTP{Fore.RESET}')
+            else: 
+                print(f'{Fore.GREEN}{proxy.split(":")[0]} HTTPS{Fore.RESET}')
         else:
+            print(f'{Fore.RED}{proxy.split(":")[0]}{Fore.RESET}')
             unsuccessful_proxies.append(proxy)
             unsuccessful_proxies_count += 1
-            print(f'{Fore.RED}{proxy.split(":")[0]} - FAILED{Fore.RESET}')
 
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
     print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
@@ -227,7 +243,7 @@ def main():
     elif send_sms_choice == 'developer':
         developer_mode = True
     else:
-        print(f"{Fore.YELLOW}SMS sending process terminated.{Fore.RESET}")
+        print(f"{Fore.RED}SMS sending process terminated.{Fore.RESET}")
         return
 
     print_title_screen()
