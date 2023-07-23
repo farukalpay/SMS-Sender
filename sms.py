@@ -5,7 +5,7 @@ import time
 import itertools
 import json
 import urllib3
-from website_config import website_configs
+import importlib.util
 from colorama import Fore, init
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -14,17 +14,20 @@ init(autoreset=True)
 
 def random_turkish_name_surname_gmail():
     first_names = [
-        'Alp', 'Aras', 'Ata', 'Aydin', 'Baran', 'Berk', 'Can', 'Cem', 'Deniz', 'Doruk',
-        'Ege', 'Eren', 'Evren', 'Ilker', 'Kaan', 'Kerem', 'Koray', 'Mert', 'Metin', 'Murat',
-        'Okan', 'Onur', 'Ozan', 'Polat', 'Sarp', 'Serkan', 'Sinan', 'Tarkan', 'Timur', 'Ufuk',
-        'Ugur', 'Volkan', 'Yagiz', 'Yalin', 'Yavuz', 'Yigit', 'Zeki', 'Adil', 'Akin', 'Altan'
+        'Benedict', 'Clarence', 'Dominic', 'Ferdinand', 'Gulliver', 'Humphrey', 'Ignatius', 'Jebediah', 'Leopold', 
+        'Mordecai', 'Nathanael', 'Octavius', 'Percival', 'Quintus', 'Rafferty', 'Sylvester', 'Thaddeus', 'Ulysses', 
+        'Vincenzo', 'Wilfred', 'Xavier', 'Yannick', 'Zacharia', 'Algernon', 'Bertrand', 'Cuthbert', 'Demetrius', 'Ebenezer',
+        'Fitzwilliam', 'Giovanni', 'Hercules', 'Isidore', 'Jeremiah', 'Kermit', 'Lazarus', 'Marcellus', 'Nehemiah', 'Obadiah', 
+        'Ptolemy', 'Quentin', 'Roderick', 'Sebastian', 'Theophilus', 'Umberto', 'Valentine', 'Wolfgang', 'Xerxes', 'Yehudi', 'Zebedee'
     ]
-    
+
     last_names = [
-        'Acar', 'Aksu', 'Aydin', 'Bilgin', 'Bulut', 'Cevik', 'Ciftci', 'Coskun', 'Demirci', 'Dincer',
-        'Dogan', 'Erol', 'Gok', 'Gokce', 'Gokmen', 'Goktas', 'Guler', 'Gunes', 'Kahraman', 'Kilic',
-        'Kose', 'Kurt', 'Ozcan', 'Ozel', 'Ozturk', 'Sari', 'Savas', 'Sezgin', 'Simsek', 'Soylu',
-        'Tasci', 'Tekin', 'Tok', 'Tosun', 'Turan', 'Ucar', 'Uysal', 'Yalcin', 'Yavuz', 'Yildirim'
+        'Blackwood', 'Carmichael', 'Davenport', 'Eggleston', 'Fitzgerald', 'Greenwood', 'Hemingway', 'Iverson', 'Jefferies', 
+        'Kilgore', 'Livingston', 'Macdonald', 'Nightingale', 'Sullivan', 'Pendleton', 'Quigley', 'Rothschild', 'Sutherland', 
+        'Tennyson', 'Underwood', 'Van Dyke', 'Whittington', 'Xanthopoulos', 'Yardley', 'Zimmermann', 'Abernathy', 'Buckminster', 
+        'Cobblepot', 'Dumbledore', 'Fitzroy', 'Goldsmith', 'Hawthorne', 'Inglewood', 'Jekyll', 'Kingsley', 'Lancaster', 'Macmillan', 
+        'Nickleby', 'Oglethorpe', 'Pilkington', 'Quincy', 'Ravenclaw', 'Stratford', 'Thornberry', 'Underhill', 'Vanderbilt', 'Worthington',
+        'Xavier', 'Yellowknife', 'Zephaniah'
     ]
 
     first_name = random.choice(first_names)
@@ -38,6 +41,12 @@ def random_turkish_name_surname_gmail():
     username = f"{first_name.lower()}{last_name.lower()}{random_string(4)}"
     gmail_address = f"{username}@gmail.com"
     return first_name, last_name, gmail_address
+
+def import_from_filepath(filepath):
+    spec = importlib.util.spec_from_file_location("module.name", filepath)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 def shuffle_proxies(proxies):
     random.shuffle(proxies)
@@ -211,7 +220,8 @@ def send_request(session, phone_number, first_name, last_name, gmail, config, de
             print(f"Error: {str(e)}")
         return False, False, 'exception'
 
-def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode=False):
+def send_sms_requests(phone_numbers, http_proxies, https_proxies, filepath, developer_mode=False):
+    website_configs = import_from_filepath(filepath).website_configs
     total_successful_requests = 0
     total_failed_requests = 0
     total_unknown_requests = 0

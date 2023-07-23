@@ -15,38 +15,61 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 init(autoreset=True)
 
-def is_valid_turkish_number(number):
-    pattern = r'^\d{10}$'
-    return re.match(pattern, number)
+def is_valid_number(number, country_code):
+    if country_code == "TR":
+        pattern = r'^\d{10}$'
+    else:
+        pattern = r'^\d{7,11}$'
+    return (re.match(pattern, number))
 
-def validate_phone_numbers(phone_numbers):
+def validate_phone_numbers(phone_numbers, country_code):
     valid_numbers = []
     invalid_numbers = []
 
     for number in phone_numbers:
-        if is_valid_turkish_number(number):
+        if is_valid_number(number, country_code):
             valid_numbers.append(number)
         else:
             invalid_numbers.append(number)
 
     return valid_numbers, invalid_numbers
 
-def get_phone_number_or_file():
+def get_country_code():
+    while True:
+        country_code = input(f"{Fore.MAGENTA}Enter target country code. Example 'US': {Fore.RESET}").lower()
+        with open('country_codes.json', 'r') as f:
+            data = json.load(f)
+            country_code = country_code.upper()
+            if country_code in data:
+                return country_code, data[country_code]
+            else:
+             print(f"{Fore.RED}Country code is not found. Please try again.{Fore.RESET}")
+
+
+def check_config_file(country_code):
+    file_name = f"websiteconfigs/website_config_{country_code}.py"
+    if os.path.isfile(file_name):
+        return file_name
+    else:
+        print(f"{Fore.RED}Error: {file_name.lower()} not found. Quiting.{Fore.RESET}")
+        return False
+
+def get_phone_number_or_file(country_code, area_code):
     while True:
         choice = input(f"{Fore.MAGENTA}Enter (1) to input phone number or (2) to provide a file path: {Fore.RESET}").lower()
         if choice == '1':
-            return get_phone_number(), None
+            return get_phone_number(country_code, area_code), None
         elif choice == '2':
             return None, get_file_path()
         else:
-            print(f"{Fore.RED}Invalid choice. Please enter 1 or 2.{Fore.RESET}")
+            print(f"{Fore.RED}Invalid choice. Please enter '1' or '2'.{Fore.RESET}")
 
-def get_phone_number():
+def get_phone_number(country_code, area_code):
     while True:
-        number = input(f"{Fore.MAGENTA}Enter the target phone number (without +90) or press Enter to import from a file: {Fore.RESET}").lower()
+        number = input(f"{Fore.MAGENTA}Enter the target phone number (without +{area_code}) or press Enter to import from a file: {Fore.RESET}").lower()
         if not number:
             return None
-        if is_valid_turkish_number(number):
+        if is_valid_number(number, country_code):
             return number
         else:
             print(f"{Fore.RED}Invalid Turkish phone number. Please try again or press Enter to import from a file.{Fore.RESET}")
@@ -60,8 +83,14 @@ def get_file_path(prompt=f"{Fore.MAGENTA}Enter the file path of the .txt file: {
             print(f"{Fore.RED}Invalid file path or format. Please enter a valid .txt file.{Fore.RESET}")
 
 def get_proxy_choice():
-    choice = input(f"{Fore.MAGENTA}Would you like to use a proxy? (y/n): {Fore.RESET}").lower()
-    return choice == 'y'
+    while True:
+        choice = input(f"{Fore.MAGENTA}Would you like to use a proxy? (y/n): {Fore.RESET}").lower()
+        if choice == 'y':
+            return 'y'
+        elif choice == 'n':
+            return None
+        else:
+            print(f"{Fore.RED}Invalid choice. Please enter 'y' or 'n'.{Fore.RESET}")
 
 def is_valid_proxy(proxy):
     pattern = re.compile(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{1,5})(:(\w+):(\w+))?$")
@@ -228,13 +257,18 @@ def main():
 
     print (r"""[ ! ] For authorized testing only. Use responsibly with explicit permission. Developer not responsible for illegal use.
            """)
+    
+    country_code, area_code = get_country_code()
+    filename = check_config_file(country_code) 
+    if filename is False:
+        return
 
-    phone_number, file_path = get_phone_number_or_file()
+    phone_number, file_path = get_phone_number_or_file(country_code, area_code)
     if file_path:
         phone_numbers = read_file(file_path)
         if phone_numbers is None:
             return
-        valid_phone_numbers, invalid_phone_numbers = validate_phone_numbers(phone_numbers)
+        valid_phone_numbers, invalid_phone_numbers = validate_phone_numbers(phone_numbers, country_code)
         if len(valid_phone_numbers) == 0:
             print(f"{Fore.RED}No valid phone numbers found in the provided file. Quitting.{Fore.RESET}")
             return
@@ -264,18 +298,22 @@ def main():
         http_proxies = []
         https_proxies = []
 
-    send_sms_choice = input(f"{Fore.MAGENTA}Do you want to start sending SMS? (y/n): {Fore.RESET}").lower()
-
-    if send_sms_choice == 'y':
-        developer_mode = False
-    elif send_sms_choice == 'developer':
-        developer_mode = True
-    else:
-        print(f"{Fore.RED}SMS sending process terminated.{Fore.RESET}")
-        return
+    while True:
+        send_sms_choice = input(f"{Fore.MAGENTA}Do you want to start sending SMS? (y/n): {Fore.RESET}").lower()
+        if send_sms_choice == 'y':
+            developer_mode = False
+            break
+        elif send_sms_choice == 'developer':
+            developer_mode = True
+            break
+        elif send_sms_choice == 'n':
+            print(f"{Fore.RED}SMS sending process terminated.{Fore.RESET}")
+            return
+        else:
+            print(f"{Fore.RED}Invalid choice. Please enter 'y' or 'n'.{Fore.RESET}")
 
     print_title_screen()
-    send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode)
+    send_sms_requests(phone_numbers, http_proxies, https_proxies, filename, developer_mode)
 
 if __name__ == "__main__":
     main()
