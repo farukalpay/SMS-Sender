@@ -5,7 +5,7 @@ The script is a powerful tool that can be used to send SMS messages to a single 
 
 Translations
 ---
-[Türkçe dokümantasyon için bana tıkla](https://github.com)
+[Türkçe dokümantasyon için bana tıkla](https://github.com/farukalpay/SMS-Sender/blob/gh-pages/translates/README-tr.md)
 
 Installation
 ----
