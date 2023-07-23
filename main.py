@@ -3,6 +3,7 @@ import requests
 import os
 import urllib3
 import chardet
+import json
 import concurrent.futures
 from colorama import Fore, init
 from sms import send_sms_requests
@@ -217,10 +218,10 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
     print(f"{Fore.GREEN}HTTP proxies: {len(http_proxies)}")
     print(f"{Fore.GREEN}HTTPS proxies: {len(https_proxies)}")
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
-    print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
+    #print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
     print(f"{Fore.RED}Unsuccessful proxies: {unsuccessful_proxies_count}{Fore.RESET}")
 
-    return successful_proxies, unsuccessful_proxies, http_proxies, https_proxies
+    return successful_proxies, http_proxies, https_proxies
 
 def main():
     print_title_screen()
@@ -255,7 +256,7 @@ def main():
             return
         proxies = valid_proxies
 
-        successful_proxies, unsuccessful_proxies, http_proxies, https_proxies = test_proxies_and_show_results(proxies)
+        successful_proxies, http_proxies, https_proxies = test_proxies_and_show_results(proxies)
         if len(successful_proxies) == 0:
             print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
             return

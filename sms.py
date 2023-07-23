@@ -43,12 +43,13 @@ def shuffle_proxies(proxies):
     random.shuffle(proxies)
     return proxies
 
-def get_next_proxy(proxy_iterator, proxies):
+def get_next_proxy(proxy_iterator_container, proxies):
     try:
-        return next(proxy_iterator)
+        return next(proxy_iterator_container[0])
     except StopIteration:
-        proxy_iterator = itertools.cycle(shuffle_proxies(proxies))
-        return next(proxy_iterator)
+        shuffled_proxies = shuffle_proxies(proxies)
+        proxy_iterator_container[0] = itertools.cycle(shuffled_proxies)  # Create a new cycle with the shuffled list
+        return next(proxy_iterator_container[0])
 
 def decompose_proxy_url(proxy_url, key):
     proxy_parts = {}
@@ -141,11 +142,8 @@ def send_request(session, phone_number, first_name, last_name, gmail, config, de
         url = config['url']
         method = config.get('method', 'POST')  # Default to 'POST' if not specified
 
-        if 'payload_function' in config:
-            payload_function = config['payload_function']
-            payload = payload_function(first_name, last_name, gmail, phone_number)
-        else:
-            payload = {k: v.format(**values) for k, v in config['payload'].items() if any(val in v for val in values.keys())}
+        payload_function = config['payload_function']
+        payload = payload_function(first_name, last_name, gmail, phone_number)
 
         if config.get('send_as_json', False):
             payload = json.dumps(payload)  # Convert the payload to a JSON string if send_as_json is True
@@ -226,8 +224,8 @@ def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode
     if len(http_proxies) > 0 or len(https_proxies) > 0:
         http_proxies = shuffle_proxies(http_proxies)
         https_proxies = shuffle_proxies(https_proxies)
-        http_proxy_iterator = itertools.cycle(http_proxies)
-        https_proxy_iterator = itertools.cycle(https_proxies)
+        http_proxy_iterator = [itertools.cycle(http_proxies)]
+        https_proxy_iterator = [itertools.cycle(https_proxies)]
         proxy_methods = {
             "http": (http_proxy_iterator, http_proxies),
             "https": (https_proxy_iterator, https_proxies),
@@ -236,6 +234,8 @@ def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode
 
     # Create session object
     session = requests.Session()
+
+    start_time = time.time()  # Start time of the loop
 
     while True:
         iteration += 1
@@ -258,22 +258,24 @@ def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode
                     if protocol not in proxy_methods or len(proxy_methods[protocol][1]) == 0:
                         print(f"{Fore.RED}No {protocol.upper()} proxies available. Cannot send request to {website}.{Fore.RESET}")
                         continue
-                    while not success_request and failure_count < 5:
-                        proxy_iterator, protocol_proxies = proxy_methods[protocol]
-                        proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
+                    max_failures = min(5, len(proxy_methods[protocol][1]))
+                    while not success_request and failure_count < max_failures:
+                        proxy_used = get_next_proxy(proxy_methods[protocol][0], proxy_methods[protocol][1])
+                        print(proxy_methods[protocol][1])
                         result = send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode, proxy_used)
                         success, success_request, msg = result
                         if developer_mode:
                             print(result)
                         if not success_request:
                             print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}" if developer_mode else f"{Fore.RED}Proxy {decompose_proxy_url(proxy_used, 'ip')} failed. Attempting with another proxy.{Fore.RESET}")
-                            proxy_iterator, protocol_proxies = proxy_methods[protocol]
-                            proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
                             failure_count += 1  # Increment failure count on failure
+                    if failure_count == max_failures and max_failures > 1:
+                        print(f"{Fore.RED}Failed to establish a connection to {website} despite attempting with {max_failures} different proxies. Moving on to next website.{Fore.RESET}")
+                        continue  # continue to the next website
 
-                if failure_count >= 5:
-                    print(f"{Fore.RED}5 times failed for {website}. Moving on to next website.{Fore.RESET}")
-                    continue  # continue to the next website
+                    elif failure_count == max_failures:
+                        print(f"{Fore.RED}Failed to establish a connection to {website} using {decompose_proxy_url(proxy_used, 'ip')} Proxy. Moving on to next website.{Fore.RESET}")
+                        continue  # continue to the next website
 
                 if not proxies:
                     result = send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode, False)
@@ -295,9 +297,11 @@ def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode
                     else:
                         failed_requests[phone_number] += 1
                         total_failed_requests += 1
-                        print(f"{Fore.CYAN}[{website}]{Fore.RED} Request is unsuccessfull for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
-
+                        if not msg == 'response timeout':
+                            print(f"{Fore.CYAN}[{website}]{Fore.RED} Request is unsuccessfull for number {index + 1}/{len(phone_numbers)} ({phone_number}) using the {proxy_used} proxy.")
+                        else:
+                            print(f"{Fore.RED}Failed to establish a connection to {website}. Moving on to next website.{Fore.RESET}")
                 if developer_mode:
                     print(f"msg: {msg}")
 
-            print(f"{Fore.BLUE}Loop: {iteration} | {Fore.BLUE}Total successful requests: {total_successful_requests} | Total failed requests: {total_failed_requests} | Total unknown requests: {total_unknown_requests}")
+            print(f"{Fore.BLUE}Loop: {iteration} | Total successful requests: {total_successful_requests} | Total failed requests: {total_failed_requests} | Total unknown requests: {total_unknown_requests}")
