@@ -15,6 +15,16 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(script_dir)
 init(autoreset=True)
 
+current_version = '1.0.0'
+
+def get_latest_version(url):
+    try:
+        response = requests.get(url)
+        latest_version = response.text.strip()
+    except Exception:
+        return False
+    return latest_version
+
 def is_valid_number(number, country_code):
     if country_code == "TR":
         pattern = r'^\d{10}$'
@@ -257,6 +267,13 @@ def main():
 
     print (r"""[ ! ] For authorized testing only. Use responsibly with explicit permission. Developer not responsible for illegal use.
            """)
+    
+    url = "https://raw.githubusercontent.com/farukalpay/SMS-Sender/main/version.txt"
+    latest_version = get_latest_version(url)
+    if latest_version and current_version != latest_version:
+            print (Fore.RED + r"""[ ! ] The version you are using is outdated. Continuing to use this version may lead to errors. 
+https://github.com/farukalpay/SMS-Sender
+                   """)
     
     country_code, area_code = get_country_code()
     filename = check_config_file(country_code) 
