@@ -3,6 +3,9 @@
 
 SMS-Sender, hedef numaraya veya birden fazla numaraya karalisteye alınmadan reklam veya spam SMS göndermeye yarayan bir araçtır. Ayrıca, proxy gibi özelliklere de sahiptir. API'lere zarar vermemek maksadıyla hiçbir ülkeye ait bir website config dosyası eklenmemiştir. Fakat örnek bir website config dosyası mevcuttur. Bunu istediğiniz gibi düzenleyip kullanabilirsiniz. SMS-Sender, doğrudan bir ülkeyi, kurumu veya kuruluşu hedeflememektedir. Config dosyası kullanmak veya oluşturmak kullanıcının kendi sorumluluğundadır.
 
+Çeviriler
+---
+[Ingilizce dokümantasyon için bana tıkla](https://github.com/farukalpay/SMS-Sender/edit/main/README.md)
 Kurulum
 ----
 ```console
