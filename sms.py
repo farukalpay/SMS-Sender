@@ -271,7 +271,6 @@ def send_sms_requests(phone_numbers, http_proxies, https_proxies, filepath, deve
                     max_failures = min(5, len(proxy_methods[protocol][1]))
                     while not success_request and failure_count < max_failures:
                         proxy_used = get_next_proxy(proxy_methods[protocol][0], proxy_methods[protocol][1])
-                        print(proxy_methods[protocol][1])
                         result = send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode, proxy_used)
                         success, success_request, msg = result
                         if developer_mode:
