@@ -1,5 +1,13 @@
-colorama==0.4.4
-requests==2.27.1
+requests==2.26.0
+random==3.8.0
+string==1.9.0
+time==3.9.0
+itertools==7.10.0
+json==2.2.0
 urllib3==1.26.7
+website_config==1.0.0
+colorama==0.4.4
+re==2.2.1
+os==1.17.2
 chardet==4.0.0
-beautifulsoup4==4.10.0
+concurrent.futures==4.0
