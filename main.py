@@ -212,12 +212,15 @@ def test_proxies_and_show_results(proxies, developer_mode=False):
                 print(f'{Fore.RED}{proxy.split(":")[0]}{Fore.RESET}')
                 unsuccessful_proxies.append(proxy)
                 unsuccessful_proxies_count += 1
-
+    http_proxies = [proxy for proxy in successful_proxies if proxy.startswith('http://')]
+    https_proxies = [proxy for proxy in successful_proxies if proxy.startswith('https://')]
+    print(f"{Fore.GREEN}HTTP proxies: {len(http_proxies)}")
+    print(f"{Fore.GREEN}HTTPS proxies: {len(https_proxies)}")
     print(f"{Fore.CYAN}Tested proxies: {tested_proxies_count}")
     print(f"{Fore.GREEN}Successful proxies: {successful_proxies_count}")
     print(f"{Fore.RED}Unsuccessful proxies: {unsuccessful_proxies_count}{Fore.RESET}")
 
-    return successful_proxies, unsuccessful_proxies
+    return successful_proxies, unsuccessful_proxies, http_proxies, https_proxies
 
 def main():
     print_title_screen()
@@ -252,13 +255,13 @@ def main():
             return
         proxies = valid_proxies
 
-        successful_proxies, unsuccessful_proxies = test_proxies_and_show_results(proxies)
+        successful_proxies, unsuccessful_proxies, http_proxies, https_proxies = test_proxies_and_show_results(proxies)
         if len(successful_proxies) == 0:
             print(f"{Fore.RED}No successful proxies. Quitting.{Fore.RESET}")
             return
-        proxies = successful_proxies
     else:
-        proxies = []
+        http_proxies = []
+        https_proxies = []
 
     send_sms_choice = input(f"{Fore.MAGENTA}Do you want to start sending SMS? (y/n): {Fore.RESET}").lower()
 
@@ -271,7 +274,7 @@ def main():
         return
 
     print_title_screen()
-    send_sms_requests(phone_numbers, proxies, developer_mode)
+    send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode)
 
 if __name__ == "__main__":
     main()

@@ -67,7 +67,7 @@ def decompose_proxy_url(proxy_url, key):
 
     return proxy_parts.get(key)
 
-def handle_response(response, success_criteria, failure_msg, response_base, proxy, developer_mode=False):
+def handle_response(response, success_criteria, failure_msg, response_base, developer_mode=False, proxy=False):
     if developer_mode:
         print(f"Response: {response.text}")
         print(f"Response status code: {response.status_code}")
@@ -75,18 +75,18 @@ def handle_response(response, success_criteria, failure_msg, response_base, prox
         
     # success_criteria and failure_msg could be a list or a string, ensure they are always lists of strings for consistency
     success_criteria = [str(criteria) for criteria in (success_criteria if isinstance(success_criteria, list) else [success_criteria])]
-    if failure_msg != "null":
+    if failure_msg:
         failure_msg = [str(msg) for msg in (failure_msg if isinstance(failure_msg, list) else [failure_msg])]
     
     if response_base == "text":
         check_attribute = response.text
         if any(criteria in check_attribute for criteria in success_criteria):
-            if proxy != "null":
+            if proxy:
                 return True, True, 'successful'
             else:
                 return True, 'successful'
         elif any(msg in check_attribute for msg in failure_msg):
-            if proxy != "null":
+            if proxy:
                 return False, True, 'failure'
             else:
                 return False, 'failure'
@@ -95,18 +95,18 @@ def handle_response(response, success_criteria, failure_msg, response_base, prox
         if developer_mode:
             print(f"Status Code: {status_code} Success Criteria: {success_criteria}")
         if status_code in success_criteria:
-            if proxy != "null":
+            if proxy:
                 return True, True, 'successful'
             else:
                 return True, 'successful'
         else:
-            if proxy != "null":
+            if proxy:
                 return False, True, 'failure'
             else:
                 return False, 'failure'
 
     # If no success or failure conditions matched, return 'unknown response'
-    if proxy != "null":
+    if proxy:
         return False, True, 'unknown response'
     else:
         return False, 'unknown response'
@@ -129,7 +129,7 @@ def handle_errors(developer_mode, e=None, proxy=None):
         else:
             return False, 'exception'
 
-def send_request(session, phone_number, first_name, last_name, gmail, proxy, config, developer_mode=False):
+def send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode=False, proxy=False):
     values = {
         'first_name': first_name,
         'last_name': last_name,
@@ -180,10 +180,10 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
                 return handle_response(
                     response,
                     config['success'] if response_base == "text" else config['status_code'],
-                    config['failure'] if response_base == "text" else "null",
+                    config['failure'] if response_base == "text" else False,
                     response_base,
-                    proxy,
-                    developer_mode
+                    developer_mode,
+                    proxy
                 )
             except Exception as e:
                 return handle_errors(developer_mode, e, proxy)
@@ -203,17 +203,17 @@ def send_request(session, phone_number, first_name, last_name, gmail, proxy, con
             return handle_response(
                 response,
                 config['success'] if response_base == "text" else config['status_code'],
-                config['failure'] if response_base == "text" else "null",
+                config['failure'] if response_base == "text" else False,
                 response_base,
-                "null",
-                developer_mode
+                developer_mode,
+                False
             )
     except Exception as e:
         if developer_mode:
             print(f"Error: {str(e)}")
         return False, False, 'exception'
 
-def send_sms_requests(phone_numbers, proxies, developer_mode=False):
+def send_sms_requests(phone_numbers, http_proxies, https_proxies, developer_mode=False):
     total_successful_requests = 0
     total_failed_requests = 0
     total_unknown_requests = 0
@@ -222,9 +222,8 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
     unknown_requests = {phone_number: 0 for phone_number in phone_numbers}
     iteration = 0
 
-    if len(proxies) > 0:
-        http_proxies = [proxy for proxy in proxies if proxy.startswith('http://')]
-        https_proxies = [proxy for proxy in proxies if proxy.startswith('https://')]
+    proxies = False
+    if len(http_proxies) > 0 or len(https_proxies) > 0:
         http_proxies = shuffle_proxies(http_proxies)
         https_proxies = shuffle_proxies(https_proxies)
         http_proxy_iterator = itertools.cycle(http_proxies)
@@ -233,7 +232,8 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
             "http": (http_proxy_iterator, http_proxies),
             "https": (https_proxy_iterator, https_proxies),
         }
-    
+        proxies = True
+
     # Create session object
     session = requests.Session()
 
@@ -249,33 +249,34 @@ def send_sms_requests(phone_numbers, proxies, developer_mode=False):
                 msg = ''
                 proxy_used = None
                 failure_count = 0  # Initialize failure count for each website
-                url = config['url']
-                protocol = url.split('://', 1)[0]  # This will get "http" or "https" from the url
-                if protocol not in ["http", "https"]:
-                    print(f'Error: protocol must be either "http" or "https". Found: {protocol}')
-                    return
-                if protocol not in proxy_methods or len(proxy_methods[protocol][1]) == 0:
-                    print(f"{Fore.RED}No {protocol.upper()} proxies available. Cannot send request to {website}.{Fore.RESET}")
-                    continue
-                while not success_request and len(proxies) > 0 and failure_count < 5:
-                    proxy_iterator, protocol_proxies = proxy_methods[protocol]
-                    proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
-                    result = send_request(session, phone_number, first_name, last_name, gmail, proxy_used, config, developer_mode)
-                    success, success_request, msg = result
-                    if developer_mode:
-                        print(result)
-                    if not success_request:
-                        print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}" if developer_mode else f"{Fore.RED}Proxy {decompose_proxy_url(proxy_used, 'ip')} failed. Attempting with another proxy.{Fore.RESET}")
+                if proxies:
+                    url = config['url']
+                    protocol = url.split('://', 1)[0]  # This will get "http" or "https" from the url
+                    if protocol not in ["http", "https"]:
+                        print(f'Error: protocol must be either "http" or "https". Found: {protocol}')
+                        return
+                    if protocol not in proxy_methods or len(proxy_methods[protocol][1]) == 0:
+                        print(f"{Fore.RED}No {protocol.upper()} proxies available. Cannot send request to {website}.{Fore.RESET}")
+                        continue
+                    while not success_request and failure_count < 5:
                         proxy_iterator, protocol_proxies = proxy_methods[protocol]
                         proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
-                        failure_count += 1  # Increment failure count on failure
+                        result = send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode, proxy_used)
+                        success, success_request, msg = result
+                        if developer_mode:
+                            print(result)
+                        if not success_request:
+                            print(f"{Fore.RED}Proxy {proxy_used} failed. Attempting with another proxy.{Fore.RESET}" if developer_mode else f"{Fore.RED}Proxy {decompose_proxy_url(proxy_used, 'ip')} failed. Attempting with another proxy.{Fore.RESET}")
+                            proxy_iterator, protocol_proxies = proxy_methods[protocol]
+                            proxy_used = get_next_proxy(proxy_iterator, protocol_proxies)
+                            failure_count += 1  # Increment failure count on failure
 
                 if failure_count >= 5:
                     print(f"{Fore.RED}5 times failed for {website}. Moving on to next website.{Fore.RESET}")
                     continue  # continue to the next website
 
-                if len(proxies) <= 0:
-                    result = send_request(session, phone_number, first_name, last_name, gmail, "null", config, developer_mode)
+                if not proxies:
+                    result = send_request(session, phone_number, first_name, last_name, gmail, config, developer_mode, False)
                     if developer_mode:
                         print(result)
                     success, msg = result
