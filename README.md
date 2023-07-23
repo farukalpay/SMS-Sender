@@ -12,6 +12,10 @@ pip3 install -r requirements.txt
 python3 main.py
 ```
 
+Translates
+----
+[Türkçe dokümantasyon için bana tıkla]([https://github.com](https://github.com/farukalpay/SMS-Sender/blob/gh-pages/translates/README-tr.md))
+
 Screenshots
 ----
 
