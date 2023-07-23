@@ -6,6 +6,7 @@ SMS-Sender, hedef numaraya veya birden fazla numaraya karalisteye alınmadan rek
 Çeviriler
 ---
 [Ingilizce dokümantasyon için bana tıkla](https://github.com/farukalpay/SMS-Sender/edit/main/README.md)
+
 Kurulum
 ----
 ```console
