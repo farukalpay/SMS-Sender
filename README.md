@@ -3,6 +3,10 @@
 
 The script is a powerful tool that can be used to send SMS messages to a single or large number of phone numbers. It can help prevent being blacklisted by phone companies, which makes it particularly helpful for sending marketing messages or verification codes. In order to avoid being blocked, the script also features a proxy capability that enables it to switch between a list of proxy servers. This increases its power and adaptability. Additionally, we continue to think about include website configuration files in the script in order to safeguard APIs. Users can currently create their own website configuration files. In the source code, there is an illustration of a website configuration file.
 
+Translations
+---
+[Türkçe dokümantasyon için bana tıkla](https://github.com)
+
 Installation
 ----
 ```console
